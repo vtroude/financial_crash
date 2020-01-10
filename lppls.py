@@ -26,7 +26,7 @@ class LPPLS:
 
 	def error(self, y, t, a, b, c, d, m, tc, w):
 		delta = self.delta(y, t, a, b, c, d, m, tc, w)
-		return (delta.dot(delta))*0.5
+		return (delta.dot(delta))*0.5/len(y)
 
 	def log_likelihood(self, y, t, a, b, c, d, m, tc, w):
 		return len(y)*0.5*np.log(self.error(y, t, a, b, c, d, m, tc, w))
@@ -88,7 +88,9 @@ class LPPLS:
 		return grad+(lambda_2-lambda_1)/(phi1-phi0)
 
 	def get_gradients(self, y, t, a, b, c, d, para, lambda_1, lambda_2, phi0, phi1):
-		error = self.error(y, t, a, b, c, d, para[0], para[1], para[2])
+		N = len(y)
+
+		error = self.error(y, t, a, b, c, d, para[0], para[1], para[2])*N
 
 		grad = self.grad_Error(y, t, a, b, c, d, para[0], para[1], para[2])
 		
@@ -279,12 +281,16 @@ class LPPLS:
 	''' Fitting, plot and print methods '''
 
 	def fit(self, price, t, m_guess=0.5, tc_guess=None, w_guess=15., rep=2, m0=0., m1=1., tc0=None, tc1=None, w0=2., w1=25., descent='steepest', precision=10.**(-6), grid_search=True):
+
 		m_guess, tc_guess, w_guess = self.set_parameters(t, m_guess, tc_guess, w_guess)
+		y = np.log(price)		
+	
 		for n in range(rep):
-			y = np.log(price)
 			if grid_search and n==0:
 				phi, m_guess, tc_guess, w_guess = self.grid_search(y, t, m0, m1, tc0, tc1, w0, w1)
 			else:
+				if tc_guess in t:
+					tc_guess = tc_guess+10.**(-8)
 				f, g, h = self.define_non_linear(t, m_guess, tc_guess, w_guess)
 				phi = self.linear_optimization(y, f, g, h)
 			m, tc, w = self.non_linear_optimization(y, t, phi[0], phi[1], phi[2], phi[3], m_guess=m_guess, tc_guess=tc_guess, w_guess=w_guess, m0=m0, m1=m1, tc0=tc0, tc1=tc1, w0=w0, w1=w1, descent=descent, precision=precision)
@@ -295,7 +301,7 @@ class LPPLS:
 		
 		self.print_para(y, t, m, tc, w, phi)
 
-		return m, tc, w, phi[0], phi[1], phi[2], phi[3], np.sum(self.delta(y, t, phi[0], phi[1], phi[2], phi[3], m, tc, w)**2)*0.5
+		return m, tc, w, phi[0], phi[1], phi[2], phi[3], self.error(y, t, phi[0], phi[1], phi[2], phi[3], m, tc, w)
 
 	def plot(self, price,t,m,tc,w,a,b,c,d, name):
 		pl.title('Lppls fit to ' + name)
